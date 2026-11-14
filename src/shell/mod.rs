@@ -1388,8 +1388,14 @@ impl Workspaces {
     }
 
     pub fn active_num(&self, output: &Output) -> (Option<usize>, usize) {
-        let set = self.sets.get(output).or(self.backup_set.as_ref()).unwrap();
-        (set.previously_active.map(|(idx, _)| idx), set.active)
+        self.try_active_num(output).unwrap()
+    }
+
+    pub fn try_active_num(&self, output: &Output) -> Option<(Option<usize>, usize)> {
+        self.sets
+            .get(output)
+            .or(self.backup_set.as_ref())
+            .map(|set| (set.previously_active.map(|(idx, _)| idx), set.active))
     }
 
     pub fn idx_for_handle(&self, output: &Output, handle: &WorkspaceHandle) -> Option<usize> {
@@ -5334,16 +5340,20 @@ impl Shell {
             }
         });
 
+        // An unplugged output still finishes its last frame without a workspace set.
+        let namespace = self
+            .workspaces
+            .try_active_num(output)
+            .map(|(_, active)| active);
         let map = smithay::desktop::layer_map_for_output(output);
         for layer_surface in map.layers() {
-            let namespace = self.workspaces.active_num(output).1;
             layer_surface.take_presentation_feedback(
                 &mut output_presentation_feedback,
                 surface_primary_scanout_output,
                 |surface, _| {
                     surface_presentation_feedback_flags_from_states(
                         surface,
-                        Some(namespace),
+                        namespace,
                         render_element_states,
                     )
                 },
