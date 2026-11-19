@@ -668,7 +668,13 @@ where
     };
 
     let shell_guard = shell.read();
-    let Some((previous_workspace, workspace)) = shell_guard.workspaces.active(output) else {
+    // `active` falls back to the backup set, but `workspace_elements` needs the output's own set.
+    // A mirroring output gets its set back only after its next config applied.
+    let Some((previous_workspace, workspace)) = shell_guard
+        .workspaces
+        .active(output)
+        .filter(|_| shell_guard.workspaces.sets.contains_key(output))
+    else {
         #[cfg(not(feature = "debug"))]
         return Ok(Vec::new());
         #[cfg(feature = "debug")]
